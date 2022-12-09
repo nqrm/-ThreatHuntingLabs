@@ -1,0 +1,24 @@
+Field, Type, Description;
+ts , T ,Timestamp of the DNS request ;
+uid ,c,Unique id of the connection ;
+orig_h, c , orig ip;
+orig_p, i , orig port;
+resp_h, c, resp ip;
+resp_p, i , resp port;
+proto , c,Protocol of DNS transaction – TCP or UDP ;
+trans_id , i,16 bit identifier assigned by DNS client;
+query ,c,Domain name subject of the query ;
+qclass ,c,Value specifying the query class ; responses match 
+qclass_name ,c,Descriptive name of the query class (e.g. C_INTERNET) ;
+qtype ,c,Value specifying the query type ;
+qtype_name ,c,Name of the query type (e.g. A, AAAA, PTR) ;
+rcode ,i,Response code value in the DNS response ;
+rcode_name ,c, Descriptive name of the response code (e.g. NOERROR, NXDOMAIN);
+QR ,l ,Was this a query or a response? T = response, F = query ;
+AA ,l ,Authoritative Answer. T = server is authoritative for query ;
+TC RD ,l ,Truncation. T = message was truncated Recursion Desired. T = request recursive lookup of query ;
+RA ,l ,Recursion Available. T = server supports recursive queries ;
+Z ,i,Reserved field, should be zero in all queries & responses ;
+answers ,f,List of resource descriptions in answer to the query ;
+TTLs ,f,Caching intervals of the answers ;
+rejected ,l ,Whether the DNS query was rejected by the server ;

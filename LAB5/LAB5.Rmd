@@ -1,0 +1,144 @@
+---
+title: 'Исследование метаданных DNS трафика'
+output: html_document
+date: "2022-11-02"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Цель работы
+### 1. Закрепить практические навыки использования языка программирования R для обработки данных
+### 2. Закрепить знания основных функций обработки данных экосистемы tidyverse языка R
+### 3. Закрепить навыки исследования метаданных DNS трафика
+
+## Общая ситуация
+### Вы исследуете подозрительную сетевую активность во внутренней сети Доброй Организации. Вам в руки попали метаданные о DNS трафике в исследуемой сети. Исследуйте файлы, восстановите данные, подготовьте их к анализу и дайте обоснованные ответы на поставленные вопросы исследования.
+
+## Задания
+
+### Подготовка данных
+
+```{r, warning=FALSE, message =FALSE, error=FALSE}
+library("tidyverse")
+```
+
+#### 1.Импортируйте данные DNS
+```{r, warning=FALSE}
+headers_csv <- read_csv("header.csv",show_col_types = FALSE)
+headers <- unlist(headers_csv[1])
+
+```
+
+```{r}
+dns <- read_tsv("dns.log", show_col_types = FALSE, col_names = headers)
+df <- as.data.frame(dns)
+
+```
+
+#### 2.Добавьте пропущенные данные о структуре данных (назначении столбцов)
+##### Сделано вручную
+
+#### 3.Преобразуйте данные в столбцах в нужный формат
+##### Сделано вручную
+
+
+### Анализ данных
+
+#### 4.Сколько участников информационного обмена в сети Доброй Организации?
+```{r}
+origs <- df %>% select("orig_h") %>% distinct(.keep_all = TRUE)
+resps <- df %>% select("resp_h") %>% distinct(.keep_all = TRUE)
+members <- bind_rows(origs,resps) %>% transmute(orig_h) %>% unique() %>% na.omit()
+count_members <- members %>% nrow()
+count_members
+```
+
+
+#### 5.Какое соотношение участников обмена внутри сети и участников обращений к внешним ресурсам
+```{r}
+v_resps <- unlist(resps)
+v_resps <- as.vector(v_resps,'character')
+inside <- str_extract(v_resps,regex("(192\\.168\\..+|10\\..+|100\\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\\..+)|172\\.(1[6-9]|2[0-9]|3[0-1])\\..+")) %>% na.omit() %>% length()
+outside <- length(v_resps) - inside
+inside / outside
+
+```
+
+
+#### 6.Найдите топ-10 участников сети, проявляющих наибольшую сетевую активность.
+```{r}
+df %>% select(orig_h) %>% group_by(orig_h) %>% summarise(count = n()) %>% arrange(desc(count)) %>% head(10)
+```
+
+
+#### 7.Найдите топ-10 доменов, к которым обращаются пользователи сети и соответственное количество обращений
+```{r}
+domains <- df %>% select(query) %>% group_by(query) %>% summarise(count = n()) %>% arrange(desc(count)) %>% head(10)
+domains
+
+```
+
+
+#### 8.Опеределите базовые статистические характеристики (функция summary()) интервала времени между последовательным обращениями к топ-10 доменам.
+```{r}
+
+fun <- function(x){
+  abs(diff(x))
+}
+
+queries <- domains %>% select(query)
+v_queries <- unlist(queries)
+v_queries <- as.vector(v_queries,'character')
+temp <- df %>% filter(query %in% v_queries) %>% select(ts) %>% arrange(ts)
+temp <- as.double(unlist(temp))
+temp <- as.POSIXct(temp, origin="1970-01-01")
+summary(temp)
+
+```
+
+
+#### 9. Часто вредоносное программное обеспечение использует DNS канал в качестве канала управления, периодически отправляя запросы на подконтрольный злоумышленникам DNS сервер. По периодическим запросам на один и тот же домен можно выявить скрытый DNS канал. Есть ли такие IP адреса в исследуемом датасете?
+
+
+### Анализ данных
+
+#### 10.Определите местоположение (страну, город) и организацию-провайдера для топ-10 доменов. Для этого можно использовать сторонние сервисы, например https://v4.ifconfig.co/.
+```{r,warning=FALSE, message =FALSE, error=FALSE}
+library(curl)
+library(jsonlite)
+
+fun_org <- function(ip) {
+  url <- toString(paste0("ifconfig.co/json?ip=",ip))
+  req <- curl_fetch_memory(url)
+  json <- parse_headers(req$content)
+  document <- fromJSON(txt=json)
+  return (document$asn_org)
+}
+
+fun_city <- function(ip) {
+  url <- toString(paste0("ifconfig.co/city?ip=",ip))
+  req <- curl_fetch_memory(url)
+  content <- parse_headers(req$content)
+  return (content$city)
+}
+
+fun_country <- function(ip) {
+  url <- toString(paste0("ifconfig.co/country?ip=",ip))
+  req <- curl_fetch_memory(url)
+  content <- parse_headers(req$content)
+  return (content$country)
+}
+
+# Ошибка: trailing garbage
+#fin_df <- df %>% filter(query %in% domains$query) %>% select(query,resp_h)
+#fin_df %>% mutate(asn_org =lapply(resp_h,fun_org) )
+#fin_df %>% mutate(city = lapply(resp_h,fun_city))
+#fin_df %>% mutate(country = lapply(resp_h,fun_country))
+
+```
+
+
+
+
